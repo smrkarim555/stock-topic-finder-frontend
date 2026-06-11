@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: 'http://localhost:8000/api' });
+const api = axios.create({
+  baseURL: 'https://stock-topic-finder-backend-production.up.railway.app/api'});
 
 export const getSettings = () => api.get('/settings').then(r => r.data);
 export const saveApiKey = (key) => api.post('/settings/api-key', { api_key: key }).then(r => r.data);
