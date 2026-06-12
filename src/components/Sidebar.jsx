@@ -1,9 +1,10 @@
-import { LayoutDashboard, Search, Bookmark, History, Key, Settings, Info, Zap } from 'lucide-react';
+import { LayoutDashboard, Search, Bookmark, History, Key, Settings, Info, Zap, CalendarDays } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'topic-finder', label: 'Topic Finder', icon: Search },
+  { id: 'seasonal-events', label: 'Seasonal Events', icon: CalendarDays },
   { id: 'saved-topics', label: 'Saved Topics', icon: Bookmark },
   { id: 'history', label: 'History', icon: History },
   { id: 'api-settings', label: 'API Settings', icon: Key },
