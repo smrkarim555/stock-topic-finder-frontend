@@ -6,6 +6,7 @@ import SavedTopics from './pages/SavedTopics';
 import History from './pages/History';
 import ApiSettings from './pages/ApiSettings';
 import { SettingsPage, AboutPage } from './pages/SettingsAbout';
+import SeasonalEvents from './pages/SeasonalEvents';
 
 export default function App() {
   const [page, setPage] = useState('topic-finder');
@@ -28,6 +29,7 @@ export default function App() {
     ),
     'saved-topics': <SavedTopics key={savedCount} onSearchTopic={navigateToSearch} />,
     'history': <History onNavigate={setPage} onSearchTopic={navigateToSearch} />,
+    'seasonal-events': <SeasonalEvents />,
     'api-settings': <ApiSettings />,
     'settings': <SettingsPage />,
     'about': <AboutPage />,
