@@ -154,7 +154,7 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
   const [error, setError] = useState('');
   const [savedIds, setSavedIds] = useState(new Set());
   const [savingId, setSavingId] = useState(null);
-  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_12_months' });
+  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_24_hours' });
   const [showFilters, setShowFilters] = useState(false);
   const [exportMsg, setExportMsg] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -298,19 +298,80 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
               <label className="text-xs font-medium text-gray-500">Country</label>
               <select className="select" value={filters.country} onChange={e => setFilters(f => ({ ...f, country: e.target.value }))}>
                 <option value="worldwide">Worldwide</option>
-                <option value="us">United States</option>
-                <option value="gb">United Kingdom</option>
-                <option value="de">Germany</option>
-                <option value="jp">Japan</option>
+                <optgroup label="Americas">
+                  <option value="us">United States</option>
+                  <option value="ca">Canada</option>
+                  <option value="mx">Mexico</option>
+                  <option value="br">Brazil</option>
+                  <option value="ar">Argentina</option>
+                  <option value="co">Colombia</option>
+                  <option value="cl">Chile</option>
+                  <option value="pe">Peru</option>
+                </optgroup>
+                <optgroup label="Europe">
+                  <option value="gb">United Kingdom</option>
+                  <option value="de">Germany</option>
+                  <option value="fr">France</option>
+                  <option value="it">Italy</option>
+                  <option value="es">Spain</option>
+                  <option value="nl">Netherlands</option>
+                  <option value="pl">Poland</option>
+                  <option value="se">Sweden</option>
+                  <option value="no">Norway</option>
+                  <option value="dk">Denmark</option>
+                  <option value="fi">Finland</option>
+                  <option value="pt">Portugal</option>
+                  <option value="be">Belgium</option>
+                  <option value="ch">Switzerland</option>
+                  <option value="at">Austria</option>
+                  <option value="ru">Russia</option>
+                  <option value="ua">Ukraine</option>
+                  <option value="tr">Turkey</option>
+                </optgroup>
+                <optgroup label="Asia">
+                  <option value="jp">Japan</option>
+                  <option value="cn">China</option>
+                  <option value="in">India</option>
+                  <option value="kr">South Korea</option>
+                  <option value="id">Indonesia</option>
+                  <option value="th">Thailand</option>
+                  <option value="vn">Vietnam</option>
+                  <option value="ph">Philippines</option>
+                  <option value="my">Malaysia</option>
+                  <option value="sg">Singapore</option>
+                  <option value="pk">Pakistan</option>
+                  <option value="bd">Bangladesh</option>
+                  <option value="sa">Saudi Arabia</option>
+                  <option value="ae">UAE</option>
+                  <option value="eg">Egypt</option>
+                  <option value="il">Israel</option>
+                  <option value="ir">Iran</option>
+                </optgroup>
+                <optgroup label="Oceania">
+                  <option value="au">Australia</option>
+                  <option value="nz">New Zealand</option>
+                </optgroup>
+                <optgroup label="Africa">
+                  <option value="za">South Africa</option>
+                  <option value="ng">Nigeria</option>
+                  <option value="ke">Kenya</option>
+                  <option value="gh">Ghana</option>
+                  <option value="et">Ethiopia</option>
+                </optgroup>
               </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Time Range</label>
               <select className="select" value={filters.time_range} onChange={e => setFilters(f => ({ ...f, time_range: e.target.value }))}>
-                <option value="past_12_months">Past 12 months</option>
-                <option value="past_3_months">Past 3 months</option>
-                <option value="past_month">Past month</option>
+                <option value="past_hour">Past hour</option>
+                <option value="past_4_hours">Past 4 hours</option>
+                <option value="past_24_hours">Past 24 hours</option>
                 <option value="past_week">Past week</option>
+                <option value="past_month">Past month</option>
+                <option value="past_3_months">Past 3 months</option>
+                <option value="past_12_months">Past year</option>
+                <option value="past_5_years">Past 5 years</option>
+                <option value="2004_present">2004 – present</option>
               </select>
             </div>
           </div>
