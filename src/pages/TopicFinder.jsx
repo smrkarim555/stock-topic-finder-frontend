@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Search, SlidersHorizontal, Download, Bookmark, BookmarkCheck, TrendingUp, TrendingDown, ChevronDown, Info, Sparkles, X } from 'lucide-react';
-import { searchTopics, saveTopic } from '../lib/api';
+import { useState, useEffect, useRef } from 'react';
+import { Search, SlidersHorizontal, Download, Bookmark, BookmarkCheck, TrendingUp, TrendingDown, ChevronDown, Info, Sparkles, X, ImagePlus, Loader2 } from 'lucide-react';
+import { searchTopics, saveTopic, analyzeImage } from '../lib/api';
 import Sparkline from '../components/Sparkline';
 import DemandBars from '../components/DemandBars';
 import { useAppPrefs } from '../hooks/useSettings';
@@ -151,19 +151,30 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
   }, []);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [savedIds, setSavedIds] = useState(new Set());
   const [savingId, setSavingId] = useState(null);
-  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_24_hours' });
+  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_12_months' });
   const [showFilters, setShowFilters] = useState(false);
   const [exportMsg, setExportMsg] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [expandedRow, setExpandedRow] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [isImageSearch, setIsImageSearch] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+  const PAGE_SIZE = 20;
 
   const handleSearch = async (kw) => {
     const q = kw || keyword;
     if (!q.trim()) return;
     setKeyword(q);
+    setIsImageSearch(false);
+    setImageFile(null);
+    setImagePreview('');
     setLoading(true);
     setError('');
     setResults(null);
@@ -171,12 +182,101 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
     setExpandedRow(null);
     setActiveFilter('All');
     try {
-      const data = await searchTopics({ keyword: q.trim(), ...filters, max_results: prefs.resultsCount });
+      const data = await searchTopics({ keyword: q.trim(), ...filters, max_results: PAGE_SIZE });
       setResults(data);
+      setHasMore((data.topics?.length || 0) >= PAGE_SIZE);
     } catch (e) {
       setError('Failed to fetch topics. Make sure the backend is running.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImagePick = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.');
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    handleImageSearch(file);
+  };
+
+  const handleImageSearch = async (file) => {
+    setIsImageSearch(true);
+    setKeyword('');
+    setLoading(true);
+    setError('');
+    setResults(null);
+    setSavedIds(new Set());
+    setExpandedRow(null);
+    setActiveFilter('All');
+    try {
+      const data = await analyzeImage(file, { maxResults: PAGE_SIZE });
+      setResults(data);
+      setHasMore((data.topics?.length || 0) >= PAGE_SIZE);
+    } catch (e) {
+      setError(e?.response?.data?.detail || 'Failed to analyze image. Make sure the backend is running and a Groq API key is set.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+    setIsImageSearch(false);
+    setResults(null);
+    setHasMore(false);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please drop an image file.');
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    handleImageSearch(file);
+  };
+
+  const handleLoadMore = async () => {
+    if (!results || loadingMore) return;
+    setLoadingMore(true);
+    setError('');
+    const existingTopics = results.topics.map(t => t.topic);
+    try {
+      let data;
+      if (isImageSearch && imageFile) {
+        data = await analyzeImage(imageFile, { maxResults: PAGE_SIZE, excludeTopics: existingTopics });
+      } else {
+        data = await searchTopics({ keyword: results.keyword, ...filters, max_results: PAGE_SIZE, exclude_topics: existingTopics });
+      }
+      const startId = results.topics.length;
+      const newTopics = (data.topics || []).map((t, i) => ({ ...t, id: startId + i + 1 }));
+      setResults(prev => ({ ...prev, topics: [...prev.topics, ...newTopics], total: prev.topics.length + newTopics.length }));
+      setHasMore(newTopics.length >= PAGE_SIZE);
+    } catch (e) {
+      setError('Failed to load more topics.');
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -233,7 +333,19 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
       </div>
 
       {/* Search Bar */}
-      <div className="card p-4 mb-4">
+      <div
+        className={`card p-4 mb-4 relative transition-colors ${isDragging ? 'border-2 border-dashed border-primary bg-primary-50/40' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDragging && (
+          <div className="absolute inset-0 flex items-center justify-center bg-primary-50/90 rounded-xl z-10">
+            <p className="text-sm font-semibold text-primary flex items-center gap-2">
+              <ImagePlus size={18} /> Drop image here to find related topics
+            </p>
+          </div>
+        )}
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -259,7 +371,36 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
             <SlidersHorizontal size={15} />Filters
             <ChevronDown size={13} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImagePick}
+          />
+          <button
+            className="btn-secondary"
+            title="Upload an image to find related topics"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+          >
+            <ImagePlus size={15} />Image
+          </button>
         </div>
+
+        {/* Image preview / active image search indicator */}
+        {isImageSearch && imagePreview && (
+          <div className="mt-3 flex items-center gap-3 bg-primary-50/60 border border-primary-100 rounded-lg px-3 py-2">
+            <img src={imagePreview} alt="Uploaded" className="w-10 h-10 rounded-md object-cover border border-white shadow-sm" />
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-700">Searching topics based on uploaded image</p>
+              <p className="text-xs text-gray-400">{imageFile?.name}</p>
+            </div>
+            <button onClick={clearImage} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-white transition-colors" title="Remove image">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Example keywords */}
         <div className="flex items-center gap-2 mt-3">
@@ -298,80 +439,19 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
               <label className="text-xs font-medium text-gray-500">Country</label>
               <select className="select" value={filters.country} onChange={e => setFilters(f => ({ ...f, country: e.target.value }))}>
                 <option value="worldwide">Worldwide</option>
-                <optgroup label="Americas">
-                  <option value="us">United States</option>
-                  <option value="ca">Canada</option>
-                  <option value="mx">Mexico</option>
-                  <option value="br">Brazil</option>
-                  <option value="ar">Argentina</option>
-                  <option value="co">Colombia</option>
-                  <option value="cl">Chile</option>
-                  <option value="pe">Peru</option>
-                </optgroup>
-                <optgroup label="Europe">
-                  <option value="gb">United Kingdom</option>
-                  <option value="de">Germany</option>
-                  <option value="fr">France</option>
-                  <option value="it">Italy</option>
-                  <option value="es">Spain</option>
-                  <option value="nl">Netherlands</option>
-                  <option value="pl">Poland</option>
-                  <option value="se">Sweden</option>
-                  <option value="no">Norway</option>
-                  <option value="dk">Denmark</option>
-                  <option value="fi">Finland</option>
-                  <option value="pt">Portugal</option>
-                  <option value="be">Belgium</option>
-                  <option value="ch">Switzerland</option>
-                  <option value="at">Austria</option>
-                  <option value="ru">Russia</option>
-                  <option value="ua">Ukraine</option>
-                  <option value="tr">Turkey</option>
-                </optgroup>
-                <optgroup label="Asia">
-                  <option value="jp">Japan</option>
-                  <option value="cn">China</option>
-                  <option value="in">India</option>
-                  <option value="kr">South Korea</option>
-                  <option value="id">Indonesia</option>
-                  <option value="th">Thailand</option>
-                  <option value="vn">Vietnam</option>
-                  <option value="ph">Philippines</option>
-                  <option value="my">Malaysia</option>
-                  <option value="sg">Singapore</option>
-                  <option value="pk">Pakistan</option>
-                  <option value="bd">Bangladesh</option>
-                  <option value="sa">Saudi Arabia</option>
-                  <option value="ae">UAE</option>
-                  <option value="eg">Egypt</option>
-                  <option value="il">Israel</option>
-                  <option value="ir">Iran</option>
-                </optgroup>
-                <optgroup label="Oceania">
-                  <option value="au">Australia</option>
-                  <option value="nz">New Zealand</option>
-                </optgroup>
-                <optgroup label="Africa">
-                  <option value="za">South Africa</option>
-                  <option value="ng">Nigeria</option>
-                  <option value="ke">Kenya</option>
-                  <option value="gh">Ghana</option>
-                  <option value="et">Ethiopia</option>
-                </optgroup>
+                <option value="us">United States</option>
+                <option value="gb">United Kingdom</option>
+                <option value="de">Germany</option>
+                <option value="jp">Japan</option>
               </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Time Range</label>
               <select className="select" value={filters.time_range} onChange={e => setFilters(f => ({ ...f, time_range: e.target.value }))}>
-                <option value="past_hour">Past hour</option>
-                <option value="past_4_hours">Past 4 hours</option>
-                <option value="past_24_hours">Past 24 hours</option>
-                <option value="past_week">Past week</option>
-                <option value="past_month">Past month</option>
+                <option value="past_12_months">Past 12 months</option>
                 <option value="past_3_months">Past 3 months</option>
-                <option value="past_12_months">Past year</option>
-                <option value="past_5_years">Past 5 years</option>
-                <option value="2004_present">2004 – present</option>
+                <option value="past_month">Past month</option>
+                <option value="past_week">Past week</option>
               </select>
             </div>
           </div>
@@ -406,7 +486,11 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
               {results ? (
                 <div className="flex items-center gap-3">
                   <h2 className="font-semibold text-gray-800 text-sm">
-                    Results for <span className="text-primary">"{results.keyword}"</span>
+                    {isImageSearch ? (
+                      <>Results based on image — <span className="text-primary">"{results.keyword}"</span></>
+                    ) : (
+                      <>Results for <span className="text-primary">"{results.keyword}"</span></>
+                    )}
                   </h2>
                   <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
                     {filteredTopics.length} results found
@@ -526,6 +610,33 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
               </tbody>
             </table>
           </div>
+
+          {/* Load more */}
+          {results && !loading && (
+            <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-center">
+              {hasMore ? (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="btn-secondary text-xs py-2 px-5"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Loading more...
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={14} />
+                      Load 20 more
+                    </>
+                  )}
+                </button>
+              ) : (
+                <span className="text-xs text-gray-400">No more topics to load</span>
+              )}
+            </div>
+          )}
 
           {/* Legend */}
           {results && (
