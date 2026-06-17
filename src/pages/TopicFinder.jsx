@@ -44,42 +44,50 @@ function ScoreBadge({ score }) {
   );
 }
 
-// Smart idea generator based on topic keyword
+// Smart idea generator - 30 Stock ideas (10 Photo + 10 Vector + 10 Icon)
 function getSmartIdeas(topicName) {
-  const kw = topicName.toLowerCase();
-  // Detect the "type" of topic to generate relevant sub-ideas
-  const typePatterns = [
-    { match: ['button'], ideas: ['apply button', 'download button', 'submit button', 'cancel button', 'buy now button', 'add to cart button', 'sign up button', 'login button', 'share button', 'back button'] },
-    { match: ['icon'], ideas: ['outline icon set', 'filled icon set', 'colored icon set', 'mono icon set', 'flat icon set', 'gradient icon set', 'line icon set', 'solid icon set', 'glyph icon set', 'multi-color icon set'] },
-    { match: ['logo'], ideas: ['minimal logo', 'badge logo', 'wordmark logo', 'lettermark logo', 'emblem logo', 'mascot logo', 'abstract logo', 'geometric logo', 'vintage logo', 'modern logo'] },
-    { match: ['banner'], ideas: ['web banner', 'social media banner', 'email banner', 'event banner', 'sale banner', 'promo banner', 'header banner', 'horizontal banner', 'vertical banner', 'animated banner'] },
-    { match: ['background', 'bg'], ideas: ['abstract background', 'gradient background', 'pattern background', 'texture background', 'geometric background', 'dark background', 'light background', 'watercolor background', 'minimal background', 'colorful background'] },
-    { match: ['pattern'], ideas: ['seamless pattern', 'geometric pattern', 'floral pattern', 'abstract pattern', 'textile pattern', 'repeat pattern', 'surface pattern', 'hand drawn pattern', 'digital pattern', 'vintage pattern'] },
-    { match: ['illustration'], ideas: ['flat illustration', 'isometric illustration', 'cartoon illustration', 'hand drawn illustration', 'character illustration', 'scene illustration', 'concept illustration', 'editorial illustration', 'vector illustration', 'minimal illustration'] },
-    { match: ['template'], ideas: ['business card template', 'flyer template', 'poster template', 'resume template', 'invoice template', 'social post template', 'presentation template', 'email template', 'brochure template', 'certificate template'] },
-    { match: ['infographic'], ideas: ['timeline infographic', 'process infographic', 'comparison infographic', 'statistical infographic', 'flowchart infographic', 'roadmap infographic', 'data infographic', 'marketing infographic', 'educational infographic', 'circular infographic'] },
+  const base = topicName.trim();
+
+  const photoIdeas = [
+    `${base} photography`,
+    `${base} photo close up`,
+    `${base} isolated white background`,
+    `${base} top view flat lay`,
+    `${base} studio shot`,
+    `${base} lifestyle photo`,
+    `${base} professional photo`,
+    `${base} high quality photo`,
+    `${base} macro photography`,
+    `${base} editorial photo`,
   ];
 
-  for (const { match, ideas } of typePatterns) {
-    if (match.some(m => kw.includes(m))) {
-      return ideas;
-    }
-  }
-
-  // Generic fallback: prepend common modifiers to the keyword
-  const base = topicName.replace(/icon[s]?|set|pack/gi, '').trim();
-  return [
-    `${base} flat design`,
-    `${base} minimal style`,
-    `${base} colorful set`,
-    `${base} outline style`,
-    `${base} gradient design`,
-    `${base} hand drawn`,
-    `${base} 3D render`,
-    `${base} isometric`,
-    `${base} cartoon style`,
-    `${base} vintage retro`,
+  const vectorIdeas = [
+    `${base} vector illustration`,
+    `${base} flat design vector`,
+    `${base} hand drawn vector`,
+    `${base} watercolor vector`,
+    `${base} cartoon vector`,
+    `${base} seamless pattern vector`,
+    `${base} clipart bundle`,
+    `${base} sticker set vector`,
+    `${base} infographic vector`,
+    `${base} logo template vector`,
   ];
+
+  const iconIdeas = [
+    `${base} icon set`,
+    `${base} flat icon`,
+    `${base} outline icon`,
+    `${base} filled icon`,
+    `${base} line icon`,
+    `${base} colored icon`,
+    `${base} gradient icon`,
+    `${base} mono icon`,
+    `${base} glyph icon`,
+    `${base} solid icon`,
+  ];
+
+  return [...photoIdeas, ...vectorIdeas, ...iconIdeas];
 }
 
 // Generate Ideas Panel shown below clicked row
@@ -91,7 +99,8 @@ function GenerateIdeasPanel({ topic, onClose, onSearch }) {
   // Auto-generate smart ideas immediately on open
   useEffect(() => {
     const smartIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
-      id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 55
+      id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 55,
+      category: i < 10 ? 'Photo' : i < 20 ? 'Vector' : 'Icon'
     }));
     setIdeas(smartIdeas);
   }, [topic.topic]);
@@ -102,26 +111,18 @@ function GenerateIdeasPanel({ topic, onClose, onSearch }) {
     setIdeas(null);
     try {
       const data = await searchTopics({ keyword: topic.topic });
-      // Merge API results with smart ideas to ensure 10 items
-      const apiTopics = data.topics.slice(0, 10);
-      const smartFallbacks = getSmartIdeas(topic.topic);
-      const apiNames = new Set(apiTopics.map(t => t.topic.toLowerCase()));
-
-      // Fill up to 10 with smart ideas if API gave fewer
-      const merged = [...apiTopics];
-      for (const smart of smartFallbacks) {
-        if (merged.length >= 10) break;
-        if (!apiNames.has(smart.toLowerCase())) {
-          merged.push({ id: merged.length + 1, topic: smart, opportunity_score: Math.floor(Math.random() * 30) + 50 });
-        }
-      }
-      setIdeas(merged.slice(0, 10));
-    } catch (e) {
-      // Fallback: use only smart ideas
-      const smartIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
-        id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 50
+      // Always use all 30 smart stock ideas
+      const allIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
+        id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 55,
+        category: i < 10 ? 'Photo' : i < 20 ? 'Vector' : 'Icon'
       }));
-      setIdeas(smartIdeas);
+      setIdeas(allIdeas);
+    } catch (e) {
+      const allIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
+        id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 55,
+        category: i < 10 ? 'Photo' : i < 20 ? 'Vector' : 'Icon'
+      }));
+      setIdeas(allIdeas);
     } finally {
       setLoading(false);
     }
@@ -168,23 +169,30 @@ function GenerateIdeasPanel({ topic, onClose, onSearch }) {
 
           {ideas && ideas.length > 0 && (
             <div className="mt-3">
-              <p className="text-xs text-gray-500 mb-2 font-medium">Related ideas — click any to search:</p>
-              <div className="flex flex-wrap gap-2">
-                {ideas.map((idea, idx) => (
-                  <button
-                    key={idea.id ?? idx}
-                    onClick={() => { onClose(); onSearch(idea.topic); }}
-                    className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 rounded-lg text-xs text-gray-700 hover:text-primary transition-all shadow-sm group"
-                  >
-                    <span className="font-medium">{idea.topic}</span>
-                    <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold text-white ${idea.opportunity_score >= 80 ? 'bg-green-500' : idea.opportunity_score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}>
-                      {idea.opportunity_score}
-                    </span>
-                    <Search size={10} className="text-gray-300 group-hover:text-primary" />
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3 flex gap-2">
+              <p className="text-xs text-gray-500 mb-3 font-medium">Related ideas — click any to search:</p>
+              {['Photo', 'Vector', 'Icon'].map(cat => (
+                <div key={cat} className="mb-3">
+                  <p className="text-xs font-bold text-gray-600 mb-1.5">
+                    {cat === 'Photo' ? '📷' : cat === 'Vector' ? '🎨' : '🖼️'} {cat}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {ideas.filter(i => i.category === cat).map((idea, idx) => (
+                      <button
+                        key={idea.id ?? idx}
+                        onClick={() => { onClose(); onSearch(idea.topic); }}
+                        className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 rounded-lg text-xs text-gray-700 hover:text-primary transition-all shadow-sm group"
+                      >
+                        <span className="font-medium">{idea.topic}</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold text-white ${idea.opportunity_score >= 80 ? 'bg-green-500' : idea.opportunity_score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}>
+                          {idea.opportunity_score}
+                        </span>
+                        <Search size={10} className="text-gray-300 group-hover:text-primary" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="mt-2 flex gap-2">
                 <button onClick={generate} className="text-xs text-primary hover:underline flex items-center gap-1">
                   <Sparkles size={11} /> Regenerate
                 </button>
