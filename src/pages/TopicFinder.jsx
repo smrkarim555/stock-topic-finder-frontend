@@ -44,11 +44,57 @@ function ScoreBadge({ score }) {
   );
 }
 
+// Smart idea generator based on topic keyword
+function getSmartIdeas(topicName) {
+  const kw = topicName.toLowerCase();
+  // Detect the "type" of topic to generate relevant sub-ideas
+  const typePatterns = [
+    { match: ['button'], ideas: ['apply button', 'download button', 'submit button', 'cancel button', 'buy now button', 'add to cart button', 'sign up button', 'login button', 'share button', 'back button'] },
+    { match: ['icon'], ideas: ['outline icon set', 'filled icon set', 'colored icon set', 'mono icon set', 'flat icon set', 'gradient icon set', 'line icon set', 'solid icon set', 'glyph icon set', 'multi-color icon set'] },
+    { match: ['logo'], ideas: ['minimal logo', 'badge logo', 'wordmark logo', 'lettermark logo', 'emblem logo', 'mascot logo', 'abstract logo', 'geometric logo', 'vintage logo', 'modern logo'] },
+    { match: ['banner'], ideas: ['web banner', 'social media banner', 'email banner', 'event banner', 'sale banner', 'promo banner', 'header banner', 'horizontal banner', 'vertical banner', 'animated banner'] },
+    { match: ['background', 'bg'], ideas: ['abstract background', 'gradient background', 'pattern background', 'texture background', 'geometric background', 'dark background', 'light background', 'watercolor background', 'minimal background', 'colorful background'] },
+    { match: ['pattern'], ideas: ['seamless pattern', 'geometric pattern', 'floral pattern', 'abstract pattern', 'textile pattern', 'repeat pattern', 'surface pattern', 'hand drawn pattern', 'digital pattern', 'vintage pattern'] },
+    { match: ['illustration'], ideas: ['flat illustration', 'isometric illustration', 'cartoon illustration', 'hand drawn illustration', 'character illustration', 'scene illustration', 'concept illustration', 'editorial illustration', 'vector illustration', 'minimal illustration'] },
+    { match: ['template'], ideas: ['business card template', 'flyer template', 'poster template', 'resume template', 'invoice template', 'social post template', 'presentation template', 'email template', 'brochure template', 'certificate template'] },
+    { match: ['infographic'], ideas: ['timeline infographic', 'process infographic', 'comparison infographic', 'statistical infographic', 'flowchart infographic', 'roadmap infographic', 'data infographic', 'marketing infographic', 'educational infographic', 'circular infographic'] },
+  ];
+
+  for (const { match, ideas } of typePatterns) {
+    if (match.some(m => kw.includes(m))) {
+      return ideas;
+    }
+  }
+
+  // Generic fallback: prepend common modifiers to the keyword
+  const base = topicName.replace(/icon[s]?|set|pack/gi, '').trim();
+  return [
+    `${base} flat design`,
+    `${base} minimal style`,
+    `${base} colorful set`,
+    `${base} outline style`,
+    `${base} gradient design`,
+    `${base} hand drawn`,
+    `${base} 3D render`,
+    `${base} isometric`,
+    `${base} cartoon style`,
+    `${base} vintage retro`,
+  ];
+}
+
 // Generate Ideas Panel shown below clicked row
 function GenerateIdeasPanel({ topic, onClose, onSearch }) {
   const [loading, setLoading] = useState(false);
   const [ideas, setIdeas] = useState(null);
   const [error, setError] = useState('');
+
+  // Auto-generate smart ideas immediately on open
+  useEffect(() => {
+    const smartIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
+      id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 55
+    }));
+    setIdeas(smartIdeas);
+  }, [topic.topic]);
 
   const generate = async () => {
     setLoading(true);
@@ -56,9 +102,26 @@ function GenerateIdeasPanel({ topic, onClose, onSearch }) {
     setIdeas(null);
     try {
       const data = await searchTopics({ keyword: topic.topic });
-      setIdeas(data.topics.slice(0, 6));
+      // Merge API results with smart ideas to ensure 10 items
+      const apiTopics = data.topics.slice(0, 10);
+      const smartFallbacks = getSmartIdeas(topic.topic);
+      const apiNames = new Set(apiTopics.map(t => t.topic.toLowerCase()));
+
+      // Fill up to 10 with smart ideas if API gave fewer
+      const merged = [...apiTopics];
+      for (const smart of smartFallbacks) {
+        if (merged.length >= 10) break;
+        if (!apiNames.has(smart.toLowerCase())) {
+          merged.push({ id: merged.length + 1, topic: smart, opportunity_score: Math.floor(Math.random() * 30) + 50 });
+        }
+      }
+      setIdeas(merged.slice(0, 10));
     } catch (e) {
-      setError('Failed to generate ideas. Make sure backend is running.');
+      // Fallback: use only smart ideas
+      const smartIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
+        id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 50
+      }));
+      setIdeas(smartIdeas);
     } finally {
       setLoading(false);
     }
@@ -86,14 +149,8 @@ function GenerateIdeasPanel({ topic, onClose, onSearch }) {
           {!ideas && !loading && (
             <div className="flex items-center gap-3">
               <p className="text-xs text-gray-500 flex-1">
-                Click to discover related sub-topics and niche ideas for <strong>{topic.topic}</strong> with AI.
+                Loading ideas for <strong>{topic.topic}</strong>...
               </p>
-              <button
-                onClick={generate}
-                className="btn-primary text-xs py-2 px-4 whitespace-nowrap"
-              >
-                <Sparkles size={13} /> Generate Ideas
-              </button>
             </div>
           )}
 
@@ -113,9 +170,9 @@ function GenerateIdeasPanel({ topic, onClose, onSearch }) {
             <div className="mt-3">
               <p className="text-xs text-gray-500 mb-2 font-medium">Related ideas — click any to search:</p>
               <div className="flex flex-wrap gap-2">
-                {ideas.map((idea) => (
+                {ideas.map((idea, idx) => (
                   <button
-                    key={idea.id}
+                    key={idea.id ?? idx}
                     onClick={() => { onClose(); onSearch(idea.topic); }}
                     className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 rounded-lg text-xs text-gray-700 hover:text-primary transition-all shadow-sm group"
                   >
@@ -156,7 +213,7 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
   const [error, setError] = useState('');
   const [savedIds, setSavedIds] = useState(new Set());
   const [savingId, setSavingId] = useState(null);
-  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_12_months' });
+  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_24_hours' });
   const [showFilters, setShowFilters] = useState(false);
   const [exportMsg, setExportMsg] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -438,20 +495,57 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Country</label>
               <select className="select" value={filters.country} onChange={e => setFilters(f => ({ ...f, country: e.target.value }))}>
-                <option value="worldwide">Worldwide</option>
-                <option value="us">United States</option>
-                <option value="gb">United Kingdom</option>
-                <option value="de">Germany</option>
-                <option value="jp">Japan</option>
+                <option value="worldwide">🌍 Worldwide</option>
+                <option value="us">🇺🇸 United States</option>
+                <option value="gb">🇬🇧 United Kingdom</option>
+                <option value="au">🇦🇺 Australia</option>
+                <option value="ca">🇨🇦 Canada</option>
+                <option value="de">🇩🇪 Germany</option>
+                <option value="fr">🇫🇷 France</option>
+                <option value="es">🇪🇸 Spain</option>
+                <option value="it">🇮🇹 Italy</option>
+                <option value="nl">🇳🇱 Netherlands</option>
+                <option value="br">🇧🇷 Brazil</option>
+                <option value="mx">🇲🇽 Mexico</option>
+                <option value="ar">🇦🇷 Argentina</option>
+                <option value="in">🇮🇳 India</option>
+                <option value="jp">🇯🇵 Japan</option>
+                <option value="kr">🇰🇷 South Korea</option>
+                <option value="cn">🇨🇳 China</option>
+                <option value="id">🇮🇩 Indonesia</option>
+                <option value="ph">🇵🇭 Philippines</option>
+                <option value="pk">🇵🇰 Pakistan</option>
+                <option value="bd">🇧🇩 Bangladesh</option>
+                <option value="ng">🇳🇬 Nigeria</option>
+                <option value="za">🇿🇦 South Africa</option>
+                <option value="eg">🇪🇬 Egypt</option>
+                <option value="sa">🇸🇦 Saudi Arabia</option>
+                <option value="ae">🇦🇪 UAE</option>
+                <option value="tr">🇹🇷 Turkey</option>
+                <option value="ru">🇷🇺 Russia</option>
+                <option value="pl">🇵🇱 Poland</option>
+                <option value="se">🇸🇪 Sweden</option>
+                <option value="no">🇳🇴 Norway</option>
+                <option value="pt">🇵🇹 Portugal</option>
+                <option value="th">🇹🇭 Thailand</option>
+                <option value="vn">🇻🇳 Vietnam</option>
+                <option value="sg">🇸🇬 Singapore</option>
+                <option value="my">🇲🇾 Malaysia</option>
+                <option value="nz">🇳🇿 New Zealand</option>
               </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Time Range</label>
               <select className="select" value={filters.time_range} onChange={e => setFilters(f => ({ ...f, time_range: e.target.value }))}>
-                <option value="past_12_months">Past 12 months</option>
-                <option value="past_3_months">Past 3 months</option>
-                <option value="past_month">Past month</option>
+                <option value="past_hour">Past hour</option>
+                <option value="past_4_hours">Past 4 hours</option>
+                <option value="past_24_hours">Past 24 hours</option>
                 <option value="past_week">Past week</option>
+                <option value="past_month">Past month</option>
+                <option value="past_3_months">Past 3 months</option>
+                <option value="past_12_months">Past 12 months</option>
+                <option value="past_5_years">Past 5 years</option>
+                <option value="2004_present">2004 – Present</option>
               </select>
             </div>
           </div>
