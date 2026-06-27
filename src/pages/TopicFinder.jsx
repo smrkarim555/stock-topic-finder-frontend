@@ -1,11 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, SlidersHorizontal, Download, Bookmark, BookmarkCheck, TrendingUp, TrendingDown, ChevronDown, Info, Sparkles, X, ImagePlus, Loader2 } from 'lucide-react';
-import { searchTopics, saveTopic, analyzeImage } from '../lib/api';
+import { Search, SlidersHorizontal, Download, Bookmark, BookmarkCheck, TrendingUp, TrendingDown, ChevronDown, Info, Sparkles, X, ImagePlus, Loader2, Camera, PenTool, Hexagon, Image as ImageIcon, Layers } from 'lucide-react';
+import { searchTopics, saveTopic, analyzeImage, generateIdeas } from '../lib/api';
 import Sparkline from '../components/Sparkline';
 import DemandBars from '../components/DemandBars';
 import { useAppPrefs } from '../hooks/useSettings';
 
 const examples = ['coffee', 'food', 'business', 'technology', 'nature', 'health'];
+
+const CATEGORY_ICONS = {
+  Photo: Camera,
+  Vector: PenTool,
+  Icon: Hexagon,
+  Illustration: ImageIcon,
+  Background: Layers,
+};
 
 function SkeletonRow() {
   return (
@@ -44,88 +52,28 @@ function ScoreBadge({ score }) {
   );
 }
 
-// Smart idea generator - 30 Stock ideas (10 Photo + 10 Vector + 10 Icon)
-function getSmartIdeas(topicName) {
-  const base = topicName.trim();
-
-  const photoIdeas = [
-    `${base} photography`,
-    `${base} photo close up`,
-    `${base} isolated white background`,
-    `${base} top view flat lay`,
-    `${base} studio shot`,
-    `${base} lifestyle photo`,
-    `${base} professional photo`,
-    `${base} high quality photo`,
-    `${base} macro photography`,
-    `${base} editorial photo`,
-  ];
-
-  const vectorIdeas = [
-    `${base} vector illustration`,
-    `${base} flat design vector`,
-    `${base} hand drawn vector`,
-    `${base} watercolor vector`,
-    `${base} cartoon vector`,
-    `${base} seamless pattern vector`,
-    `${base} clipart bundle`,
-    `${base} sticker set vector`,
-    `${base} infographic vector`,
-    `${base} logo template vector`,
-  ];
-
-  const iconIdeas = [
-    `${base} icon set`,
-    `${base} flat icon`,
-    `${base} outline icon`,
-    `${base} filled icon`,
-    `${base} line icon`,
-    `${base} colored icon`,
-    `${base} gradient icon`,
-    `${base} mono icon`,
-    `${base} glyph icon`,
-    `${base} solid icon`,
-  ];
-
-  return [...photoIdeas, ...vectorIdeas, ...iconIdeas];
-}
-
 // Generate Ideas Panel shown below clicked row
 function GenerateIdeasPanel({ topic, onClose, onSearch }) {
   const [loading, setLoading] = useState(false);
-  const [ideas, setIdeas] = useState(null);
+  const [categories, setCategories] = useState(null);
   const [error, setError] = useState('');
 
-  // Auto-generate smart ideas immediately on open
-  useEffect(() => {
-    const smartIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
-      id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 55,
-      category: i < 10 ? 'Photo' : i < 20 ? 'Vector' : 'Icon'
-    }));
-    setIdeas(smartIdeas);
-  }, [topic.topic]);
-
-  const generate = async () => {
+  const generate = async (excludeList = []) => {
     setLoading(true);
     setError('');
-    setIdeas(null);
     try {
-      const data = await searchTopics({ keyword: topic.topic });
-      // Always use all 30 smart stock ideas
-      const allIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
-        id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 55,
-        category: i < 10 ? 'Photo' : i < 20 ? 'Vector' : 'Icon'
-      }));
-      setIdeas(allIdeas);
+      const data = await generateIdeas(topic.topic, { exclude: excludeList });
+      setCategories(data.categories || []);
     } catch (e) {
-      const allIdeas = getSmartIdeas(topic.topic).map((s, i) => ({
-        id: i + 1, topic: s, opportunity_score: Math.floor(Math.random() * 30) + 55,
-        category: i < 10 ? 'Photo' : i < 20 ? 'Vector' : 'Icon'
-      }));
-      setIdeas(allIdeas);
+      setError('Failed to generate ideas. Make sure backend is running.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRegenerate = () => {
+    const existing = (categories || []).flatMap(cat => cat.ideas.map(i => i.topic));
+    generate(existing);
   };
 
   return (
@@ -147,11 +95,17 @@ function GenerateIdeasPanel({ topic, onClose, onSearch }) {
             </button>
           </div>
 
-          {!ideas && !loading && (
+          {!categories && !loading && (
             <div className="flex items-center gap-3">
               <p className="text-xs text-gray-500 flex-1">
-                Loading ideas for <strong>{topic.topic}</strong>...
+                Generate distinct Photo, Vector, Icon, Illustration, and Background ideas for <strong>{topic.topic}</strong> with AI — each one different, not the same idea reworded.
               </p>
+              <button
+                onClick={() => generate([])}
+                className="btn-primary text-xs py-2 px-4 whitespace-nowrap"
+              >
+                <Sparkles size={13} /> Generate Ideas
+              </button>
             </div>
           )}
 
@@ -167,34 +121,40 @@ function GenerateIdeasPanel({ topic, onClose, onSearch }) {
 
           {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
 
-          {ideas && ideas.length > 0 && (
-            <div className="mt-3">
+          {categories && categories.length > 0 && (
+            <div className="mt-2">
               <p className="text-xs text-gray-500 mb-3 font-medium">Related ideas — click any to search:</p>
-              {['Photo', 'Vector', 'Icon'].map(cat => (
-                <div key={cat} className="mb-3">
-                  <p className="text-xs font-bold text-gray-600 mb-1.5">
-                    {cat === 'Photo' ? '📷' : cat === 'Vector' ? '🎨' : '🖼️'} {cat}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {ideas.filter(i => i.category === cat).map((idea, idx) => (
-                      <button
-                        key={idea.id ?? idx}
-                        onClick={() => { onClose(); onSearch(idea.topic); }}
-                        className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 rounded-lg text-xs text-gray-700 hover:text-primary transition-all shadow-sm group"
-                      >
-                        <span className="font-medium">{idea.topic}</span>
-                        <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold text-white ${idea.opportunity_score >= 80 ? 'bg-green-500' : idea.opportunity_score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}>
-                          {idea.opportunity_score}
-                        </span>
-                        <Search size={10} className="text-gray-300 group-hover:text-primary" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div className="mt-2 flex gap-2">
-                <button onClick={generate} className="text-xs text-primary hover:underline flex items-center gap-1">
-                  <Sparkles size={11} /> Regenerate
+              <div className="space-y-3">
+                {categories.map(cat => {
+                  const CatIcon = CATEGORY_ICONS[cat.name] || Sparkles;
+                  return (
+                    <div key={cat.name}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <CatIcon size={12} className="text-gray-400" />
+                        <span className="text-xs font-semibold text-gray-500">{cat.name}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {cat.ideas.map((idea) => (
+                          <button
+                            key={idea.id}
+                            onClick={() => { onClose(); onSearch(idea.topic); }}
+                            className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 rounded-lg text-xs text-gray-700 hover:text-primary transition-all shadow-sm group"
+                          >
+                            <span className="font-medium">{idea.topic}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold text-white ${idea.opportunity_score >= 80 ? 'bg-green-500' : idea.opportunity_score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}>
+                              {idea.opportunity_score}
+                            </span>
+                            <Search size={10} className="text-gray-300 group-hover:text-primary" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={handleRegenerate} className="text-xs text-primary hover:underline flex items-center gap-1">
+                  <Sparkles size={11} /> Regenerate (fresh ideas only, no repeats)
                 </button>
               </div>
             </div>
@@ -221,7 +181,7 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
   const [error, setError] = useState('');
   const [savedIds, setSavedIds] = useState(new Set());
   const [savingId, setSavingId] = useState(null);
-  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_24_hours' });
+  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_12_months' });
   const [showFilters, setShowFilters] = useState(false);
   const [exportMsg, setExportMsg] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -503,57 +463,20 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Country</label>
               <select className="select" value={filters.country} onChange={e => setFilters(f => ({ ...f, country: e.target.value }))}>
-                <option value="worldwide">🌍 Worldwide</option>
-                <option value="us">🇺🇸 United States</option>
-                <option value="gb">🇬🇧 United Kingdom</option>
-                <option value="au">🇦🇺 Australia</option>
-                <option value="ca">🇨🇦 Canada</option>
-                <option value="de">🇩🇪 Germany</option>
-                <option value="fr">🇫🇷 France</option>
-                <option value="es">🇪🇸 Spain</option>
-                <option value="it">🇮🇹 Italy</option>
-                <option value="nl">🇳🇱 Netherlands</option>
-                <option value="br">🇧🇷 Brazil</option>
-                <option value="mx">🇲🇽 Mexico</option>
-                <option value="ar">🇦🇷 Argentina</option>
-                <option value="in">🇮🇳 India</option>
-                <option value="jp">🇯🇵 Japan</option>
-                <option value="kr">🇰🇷 South Korea</option>
-                <option value="cn">🇨🇳 China</option>
-                <option value="id">🇮🇩 Indonesia</option>
-                <option value="ph">🇵🇭 Philippines</option>
-                <option value="pk">🇵🇰 Pakistan</option>
-                <option value="bd">🇧🇩 Bangladesh</option>
-                <option value="ng">🇳🇬 Nigeria</option>
-                <option value="za">🇿🇦 South Africa</option>
-                <option value="eg">🇪🇬 Egypt</option>
-                <option value="sa">🇸🇦 Saudi Arabia</option>
-                <option value="ae">🇦🇪 UAE</option>
-                <option value="tr">🇹🇷 Turkey</option>
-                <option value="ru">🇷🇺 Russia</option>
-                <option value="pl">🇵🇱 Poland</option>
-                <option value="se">🇸🇪 Sweden</option>
-                <option value="no">🇳🇴 Norway</option>
-                <option value="pt">🇵🇹 Portugal</option>
-                <option value="th">🇹🇭 Thailand</option>
-                <option value="vn">🇻🇳 Vietnam</option>
-                <option value="sg">🇸🇬 Singapore</option>
-                <option value="my">🇲🇾 Malaysia</option>
-                <option value="nz">🇳🇿 New Zealand</option>
+                <option value="worldwide">Worldwide</option>
+                <option value="us">United States</option>
+                <option value="gb">United Kingdom</option>
+                <option value="de">Germany</option>
+                <option value="jp">Japan</option>
               </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Time Range</label>
               <select className="select" value={filters.time_range} onChange={e => setFilters(f => ({ ...f, time_range: e.target.value }))}>
-                <option value="past_hour">Past hour</option>
-                <option value="past_4_hours">Past 4 hours</option>
-                <option value="past_24_hours">Past 24 hours</option>
-                <option value="past_week">Past week</option>
-                <option value="past_month">Past month</option>
-                <option value="past_3_months">Past 3 months</option>
                 <option value="past_12_months">Past 12 months</option>
-                <option value="past_5_years">Past 5 years</option>
-                <option value="2004_present">2004 – Present</option>
+                <option value="past_3_months">Past 3 months</option>
+                <option value="past_month">Past month</option>
+                <option value="past_week">Past week</option>
               </select>
             </div>
           </div>
