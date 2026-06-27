@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import TopicFinder from './pages/TopicFinder';
+import MarketAnalyzer from './pages/MarketAnalyzer';
 import SavedTopics from './pages/SavedTopics';
 import History from './pages/History';
 import ApiSettings from './pages/ApiSettings';
@@ -27,6 +28,7 @@ export default function App() {
         onSaveSuccess={() => setSavedCount(c => c + 1)}
       />
     ),
+    'market-analyzer': <MarketAnalyzer onSearchTopic={navigateToSearch} />,
     'saved-topics': <SavedTopics key={savedCount} onSearchTopic={navigateToSearch} />,
     'history': <History onNavigate={setPage} onSearchTopic={navigateToSearch} />,
     'seasonal-events': <SeasonalEvents />,
