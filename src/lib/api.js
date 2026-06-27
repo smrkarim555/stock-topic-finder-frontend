@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://stock-topic-finder-backend-production.up.railway.app/api',
+  baseURL: 'http://localhost:8000/api',
 });
 
 export const getSettings = () => api.get('/settings').then(r => r.data);
@@ -9,6 +9,12 @@ export const saveApiKey = (key) => api.post('/settings/api-key', { api_key: key 
 export const deleteApiKey = () => api.delete('/settings/api-key').then(r => r.data);
 
 export const searchTopics = (params) => api.post('/search', params).then(r => r.data);
+
+export const generateIdeas = (topic, { exclude = [], perCategory = 6 } = {}) =>
+  api.post('/generate-ideas', { topic, exclude, per_category: perCategory }).then(r => r.data);
+
+export const analyzeMarket = ({ market, keyword, nicheCount = 5, keywordsPerNiche = 16 }) =>
+  api.post('/market-analyze', { market, keyword, niche_count: nicheCount, keywords_per_niche: keywordsPerNiche }).then(r => r.data);
 
 export const analyzeImage = (file, { maxResults = 20, excludeTopics = [] } = {}) => {
   const form = new FormData();
