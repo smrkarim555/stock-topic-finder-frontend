@@ -181,7 +181,7 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
   const [error, setError] = useState('');
   const [savedIds, setSavedIds] = useState(new Set());
   const [savingId, setSavingId] = useState(null);
-  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_12_months' });
+  const [filters, setFilters] = useState({ topic_type: 'all', category: 'all', country: 'worldwide', time_range: 'past_24_hours' });
   const [showFilters, setShowFilters] = useState(false);
   const [exportMsg, setExportMsg] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -463,20 +463,45 @@ export default function TopicFinder({ onSaveSuccess, initialKeyword = '' }) {
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Country</label>
               <select className="select" value={filters.country} onChange={e => setFilters(f => ({ ...f, country: e.target.value }))}>
-                <option value="worldwide">Worldwide</option>
+                <option value="worldwide">All Countries</option>
                 <option value="us">United States</option>
                 <option value="gb">United Kingdom</option>
+                <option value="bd">Bangladesh</option>
+                <option value="in">India</option>
                 <option value="de">Germany</option>
+                <option value="fr">France</option>
+                <option value="ca">Canada</option>
+                <option value="au">Australia</option>
+                <option value="br">Brazil</option>
                 <option value="jp">Japan</option>
+                <option value="kr">South Korea</option>
+                <option value="id">Indonesia</option>
+                <option value="pk">Pakistan</option>
+                <option value="sa">Saudi Arabia</option>
+                <option value="ae">UAE</option>
+                <option value="ru">Russia</option>
+                <option value="tr">Turkey</option>
+                <option value="mx">Mexico</option>
+                <option value="it">Italy</option>
+                <option value="es">Spain</option>
+                <option value="nl">Netherlands</option>
+                <option value="pl">Poland</option>
+                <option value="ng">Nigeria</option>
+                <option value="za">South Africa</option>
               </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Time Range</label>
               <select className="select" value={filters.time_range} onChange={e => setFilters(f => ({ ...f, time_range: e.target.value }))}>
-                <option value="past_12_months">Past 12 months</option>
-                <option value="past_3_months">Past 3 months</option>
-                <option value="past_month">Past month</option>
+                <option value="past_hour">Past hour</option>
+                <option value="past_4_hours">Past 4 hours</option>
+                <option value="past_24_hours">Past 24 hours</option>
                 <option value="past_week">Past week</option>
+                <option value="past_month">Past month</option>
+                <option value="past_3_months">Past 3 months</option>
+                <option value="past_12_months">Past year</option>
+                <option value="past_5_years">Past 5 years</option>
+                <option value="2004_present">2004 - present</option>
               </select>
             </div>
           </div>
